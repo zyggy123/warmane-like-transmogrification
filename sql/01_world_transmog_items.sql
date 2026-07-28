@@ -25,6 +25,13 @@ INSERT INTO `item_template` SELECT * FROM `tmp_scroll_wotlk`;
 
 DROP TEMPORARY TABLE `tmp_scroll_wotlk`;
 
+/* Fix class/subclass/material to match the DBC expectations for these
+   retail entry IDs; otherwise the core rejects them on load. */
+UPDATE `item_template` SET `class`=9, `subclass`=3, `Material`=-1 WHERE `entry`=23885;
+UPDATE `item_template` SET `class`=9, `subclass`=2, `Material`=-1 WHERE `entry`=24315;
+UPDATE `item_template` SET `class`=9, `subclass`=1, `Material`=-1 WHERE `entry`=35517;
+UPDATE `item_template` SET `class`=12, `subclass`=0, `Material`=8, `SoundOverrideSubclass`=0 WHERE `entry`=38567;
+
 /* Spell 7420 (Enchant Chest - Minor Health) restricts client-side targeting to
    chest items via Spell.dbc EquippedItemInventoryTypeMask. Spell 47147
    ("Test On Use Enchant") has EquippedItemClass=-1 (targets any item) and an
