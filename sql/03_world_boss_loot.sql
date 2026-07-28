@@ -25,7 +25,7 @@ CREATE TEMPORARY TABLE `tmp_boss_lootids` (
 INSERT IGNORE INTO `tmp_boss_lootids`
 SELECT ct.`lootid`
 FROM `creature_template` ct
-JOIN `creature` c ON c.`id1` = ct.`entry`
+JOIN `creature` c ON c.`id` = ct.`entry`
 WHERE FIND_IN_SET(c.`map`, @MAPS)
   AND ct.`rank` = 3
   AND ct.`lootid` > 0;
@@ -34,7 +34,7 @@ WHERE FIND_IN_SET(c.`map`, @MAPS)
 INSERT IGNORE INTO `tmp_boss_lootids`
 SELECT dt.`lootid`
 FROM `creature_template` ct
-JOIN `creature` c ON c.`id1` = ct.`entry`
+JOIN `creature` c ON c.`id` = ct.`entry`
 JOIN `creature_template` dt ON dt.`entry` = ct.`difficulty_entry_1`
 WHERE FIND_IN_SET(c.`map`, @MAPS)
   AND ct.`rank` = 3
@@ -44,7 +44,7 @@ WHERE FIND_IN_SET(c.`map`, @MAPS)
 INSERT IGNORE INTO `tmp_boss_lootids`
 SELECT dt.`lootid`
 FROM `creature_template` ct
-JOIN `creature` c ON c.`id1` = ct.`entry`
+JOIN `creature` c ON c.`id` = ct.`entry`
 JOIN `creature_template` dt ON dt.`entry` = ct.`difficulty_entry_2`
 WHERE FIND_IN_SET(c.`map`, @MAPS)
   AND ct.`rank` = 3
@@ -54,7 +54,7 @@ WHERE FIND_IN_SET(c.`map`, @MAPS)
 INSERT IGNORE INTO `tmp_boss_lootids`
 SELECT dt.`lootid`
 FROM `creature_template` ct
-JOIN `creature` c ON c.`id1` = ct.`entry`
+JOIN `creature` c ON c.`id` = ct.`entry`
 JOIN `creature_template` dt ON dt.`entry` = ct.`difficulty_entry_3`
 WHERE FIND_IN_SET(c.`map`, @MAPS)
   AND ct.`rank` = 3
