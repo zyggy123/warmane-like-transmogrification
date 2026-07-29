@@ -11,6 +11,7 @@ Players use **scrolls** dropped by raid bosses to extract and apply item appeara
 [![AzerothCore](https://img.shields.io/badge/AzerothCore-3.3.5a-brightgreen)](https://www.azerothcore.org/)
 [![Eluna](https://img.shields.io/badge/Eluna-required-orange)](https://github.com/azerothcore/mod-eluna)
 
+
 ## Description
 
 Traditional transmogrification uses an NPC with a gossip menu. This module replaces that with **consumable scrolls** that work like profession recipes:
@@ -150,3 +151,5 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 ## License
 
 This project is licensed under the [GNU AGPL-3.0](LICENSE) - see the LICENSE file for details.
+
+[![Demo Video](https://img.youtube.com/vi/VqcIbjDTqYA/maxresdefault.jpg)](https://www.youtube.com/watch?v=VqcIbjDTqYA)
