@@ -20,7 +20,7 @@ INSERT INTO `item_template` SELECT * FROM `tmp_scroll_wotlk`;
 
 /* Stackable=1: each Essence tracks its own source item per item GUID.
    Stacked essences would lose their per-GUID metadata. */
-UPDATE `tmp_scroll_wotlk` SET `entry`=38567, `name`='Essence of Placeholder', `displayid`=5563, `Quality`=4, `MaxCount`=0, `Stackable`=1, `FlagsExtra`=0, `description`='Use: Apply the stored appearance to a compatible item.';
+UPDATE `tmp_scroll_wotlk` SET `entry`=38567, `name`='Essence', `displayid`=5563, `Quality`=4, `MaxCount`=0, `Stackable`=1, `FlagsExtra`=0, `description`='Use: Apply the stored appearance to a compatible item.';
 INSERT INTO `item_template` SELECT * FROM `tmp_scroll_wotlk`;
 
 DROP TEMPORARY TABLE `tmp_scroll_wotlk`;
