@@ -13,6 +13,10 @@ local C = {
     PURIFICATION = 24315,
     ESSENCE = 38567,
     LEGENDARY_ESSENCE = 38567,
+    -- Offset added to the source item entry to derive a unique named
+    -- essence entry (e.g. 200000 + 49623 = 249623 → "Essence of Shadowmourne").
+    -- Must match the formula in sql/05_world_essence_names.sql.
+    ESSENCE_ENTRY_OFFSET = 200000,
     LEGENDARY = 5,
     SESSION_TIMEOUT = 120,
     -- WotLK PLAYER_VISIBLE_ITEM_1_ENTRYID and two uint32 fields per slot.
@@ -49,6 +53,10 @@ local C = {
 }
 
 local sessions, fakeByPlayer, ownerByItem = {}, {}, {}
+
+local function isEssence(entry)
+    return entry == C.ESSENCE or entry == C.LEGENDARY_ESSENCE
+end
 
 local function debugLog(text)
     if not C.DEBUG then return end
@@ -271,7 +279,7 @@ local function extract(player, scroll, target)
         say(player, "Use Scroll of Illusion for Legendary items.")
         return false
     end
-    local essenceEntry = scroll == C.ILLUSION and C.LEGENDARY_ESSENCE or C.ESSENCE
+    local essenceEntry = C.ESSENCE
     local essence = player:AddItem(essenceEntry, 1)
     if not essence then
         debugLog("extract failed reason=AddItem returned nil entry=" .. essenceEntry)
@@ -281,7 +289,7 @@ local function extract(player, scroll, target)
     CharDBExecute(string.format("REPLACE INTO essence_tracking (essence_item_id, original_item_name, owner_guid, appearance_entry, source_class, source_subclass, source_inventory_type) VALUES (%d,'%s',%d,%d,%d,%d,%d)", iid(essence), target:GetName():gsub("'", "''"), pid(player), itemEntry(target), target:GetClass(), target:GetSubClass(), target:GetInventoryType()))
     consume(player, scroll)
     debugLog(string.format("extract success source=%d essence=%d essenceGuid=%d", itemEntry(target), essenceEntry, iid(essence)))
-    say(player, "Appearance of |cff1eff00" .. target:GetName() .. "|r extracted into Essence. The source item was preserved.")
+    say(player, "Appearance of |cff1eff00" .. target:GetName() .. "|r extracted into an Essence. Use the Essence on a compatible item to apply it.")
     return true
 end
 
@@ -353,16 +361,20 @@ local function itemUse(event, player, item, target)
         end
         return false
     end
-    if e == C.ESSENCE then
+    if isEssence(e) then
         local sourceName = essenceInfo(player, item)
-        if sourceName then say(player, "This Essence holds the appearance of: |cff1eff00" .. sourceName .. "|r") end
+        if sourceName then say(player, "This Essence holds the appearance of: |cff1eff00" .. sourceName .. "|r.") end
         if target then
             debugLog("essence received target immediately")
             applyEssence(player, item, target)
         else
             sessions[pid(player)] = { mode = "apply", essenceGuid = iid(item), time = os.time() }
             debugLog("essence target=nil; session armed, waiting for a second item-use event")
-            say(player, "Select a compatible equipped item to receive this appearance.")
+            if sourceName then
+                say(player, "Select a compatible equipped item to apply the appearance of |cff1eff00" .. sourceName .. "|r.")
+            else
+                say(player, "Select a compatible equipped item to receive this appearance.")
+            end
         end
         return false
     end
@@ -391,8 +403,13 @@ local function essenceMenu(player, s)
     s.step = "essence"
     menu(player, "Choose Essence")
     for _, item in ipairs(inventory(player)) do
-        if itemEntry(item) == C.ESSENCE or itemEntry(item) == C.LEGENDARY_ESSENCE then
-            add(player, item:GetItemLink(player:GetDbcLocale()), 5, iid(item))
+        if isEssence(itemEntry(item)) then
+            local sourceName = essenceInfo(player, item)
+            if sourceName then
+                add(player, "Essence [" .. sourceName .. "]", 5, iid(item))
+            else
+                add(player, item:GetItemLink(player:GetDbcLocale()), 5, iid(item))
+            end
         end
     end
     add(player, "Back", 8, 0); player:GossipSendMenu(1, player, 0)
@@ -402,9 +419,14 @@ local function targetMenu(player, s)
     s.step = "target"
     local essence = findItem(player, s.essenceGuid)
     if not essence then close(player); return end
+    -- Look up the source item's category from essence_tracking (the essence
+    -- itself is a Trade Good so category(essence) would return nil).
+    local row = CharDBQuery("SELECT appearance_entry,source_class,source_subclass,source_inventory_type FROM essence_tracking WHERE essence_item_id=" .. iid(essence) .. " AND owner_guid=" .. pid(player) .. " ORDER BY id DESC LIMIT 1")
+    local sourceCategory = row and categoryValues(row:GetUInt32(1), row:GetUInt32(2), row:GetUInt32(3)) or nil
+    local appearance = row and row:GetUInt32(0) or 0
     menu(player, "Apply appearance to equipped item")
     for _, item in ipairs(equipped(player)) do
-        if item ~= essence and eligible(player, item) and compatible(essence, item) then
+        if item ~= essence and eligible(player, item) and compatibleCategory(sourceCategory, item) and itemEntry(item) ~= appearance then
             add(player, item:GetItemLink(player:GetDbcLocale()), 6, iid(item))
         end
     end
@@ -426,7 +448,7 @@ local function select(event, player, item, sender, action)
     if sender == 4 then
         local source = findItem(player, action)
         if not source or not eligible(player, source) then close(player); return true end
-        local out = s.scroll == C.ILLUSION and C.LEGENDARY_ESSENCE or C.ESSENCE
+        local out = C.ESSENCE
         local essence = player:AddItem(out, 1)
         if not essence then say(player, "Inventory is full."); close(player); return true end
         CharDBExecute(string.format("REPLACE INTO essence_tracking (essence_item_id, original_item_name, owner_guid, appearance_entry) VALUES (%d,'%s',%d,%d)", iid(essence), source:GetName():gsub("'", "''"), pid(player), itemEntry(source)))
@@ -435,16 +457,16 @@ local function select(event, player, item, sender, action)
     end
     if sender == 5 then
         local essence = findItem(player, action)
-        if essence and (itemEntry(essence) == C.ESSENCE or itemEntry(essence) == C.LEGENDARY_ESSENCE) then s.essenceGuid = action; targetMenu(player, s) end
+        if essence and isEssence(itemEntry(essence)) then s.essenceGuid = action; targetMenu(player, s) end
         return true
     end
     if sender == 6 then
         local target, essence = findItem(player, action), findItem(player, s.essenceGuid)
-        if not target or not essence or not eligible(player, target) or not compatible(essence, target) then close(player); return true end
-    local row = CharDBQuery("SELECT appearance_entry,source_class,source_subclass,source_inventory_type FROM essence_tracking WHERE essence_item_id=" .. iid(essence) .. " AND owner_guid=" .. pid(player) .. " ORDER BY id DESC LIMIT 1")
-    local appearance = row and row:GetUInt32(0) or 0
-    local sourceCategory = row and categoryValues(row:GetUInt32(1), row:GetUInt32(2), row:GetUInt32(3)) or nil
-    if appearance == 0 or not compatibleCategory(sourceCategory, target) or not setFake(target, appearance) then close(player); return true end
+        if not target or not essence or not eligible(player, target) then close(player); return true end
+        local row = CharDBQuery("SELECT appearance_entry,source_class,source_subclass,source_inventory_type FROM essence_tracking WHERE essence_item_id=" .. iid(essence) .. " AND owner_guid=" .. pid(player) .. " ORDER BY id DESC LIMIT 1")
+        local appearance = row and row:GetUInt32(0) or 0
+        local sourceCategory = row and categoryValues(row:GetUInt32(1), row:GetUInt32(2), row:GetUInt32(3)) or nil
+        if appearance == 0 or not compatibleCategory(sourceCategory, target) or not setFake(target, appearance) then close(player); return true end
         CharDBExecute("DELETE FROM essence_tracking WHERE essence_item_id=" .. iid(essence))
         player:RemoveItem(essence, 1); player:RemoveItem(item, 1); say(player, "Appearance applied.")
         sessions[pid(player)] = nil; close(player); return true
@@ -528,9 +550,13 @@ if C.DROP_MODE == "onkill" then
     end
 end
 
-for _, itemEntryId in ipairs({ C.DECEPTION, C.ILLUSION, C.PURIFICATION, C.ESSENCE }) do
+for _, itemEntryId in ipairs({ C.DECEPTION, C.ILLUSION, C.PURIFICATION }) do
     debugLog("register item event entry=" .. itemEntryId)
     RegisterItemEvent(itemEntryId, 2, itemUse)
+end
+RegisterItemEvent(C.ESSENCE, 2, itemUse)
+if C.LEGENDARY_ESSENCE ~= C.ESSENCE then
+    RegisterItemEvent(C.LEGENDARY_ESSENCE, 2, itemUse)
 end
 RegisterPlayerEvent(3, onLogin)
 RegisterPlayerEvent(4, onLogout)
